@@ -9,9 +9,12 @@ Each Expert implements the same .predict_prob(pairs) API as our Hugging-Face
 models, so they can be blended seamlessly in the Mixture-of-Experts gate.
 
 Ready-made experts:
-  • LRFeatureExpert   – LogisticRegression
-  • XGBFeatureExpert  – XGBoost (requires `pip install xgboost`)
-  • LGBMFeatureExpert – LightGBM (requires `pip install lightgbm`)
+  * LRFeatureExpert        – LogisticRegression
+  * XGBFeatureExpert       – XGBoost (requires `pip install xgboost`)
+  * LGBMFeatureExpert      – LightGBM (requires `pip install lightgbm`)
+  * KNNFeatureExpert       – K-Nearest Neighbors (scikit-learn)
+  * RFFeatureExpert        – Random Forest classifier (scikit-learn)
+  * SVMFeatureExpert       – SVM with probability estimates (scikit-learn)
 
 Usage example:
     from src.custom_models import LRFeatureExpert
@@ -129,14 +132,14 @@ class FeatureExpert(BaseExpert):
         _new_model() → an unfitted sklearn-compatible estimator.
 
     Implementation details:
-      • __init__ (inherited from BaseExpert) calls self._load().
-      • _load(): tries to unpickle self.model_path; if not found, calls self._new_model().
-      • _predict_impl(pairs): 
+      * __init__ (inherited from BaseExpert) calls self._load().
+      * _load(): tries to unpickle self.model_path; if not found, calls self._new_model().
+      * _predict_impl(pairs): 
           1) converts raw-text pairs → DataFrame with qid1, qid2
           2) calls build_features(...) → (n_pairs, 3 598) numpy array
              followed by PCA internally
           3) runs self.clf.predict_proba(X_pca)[:, 1] → duplicate probabilities
-      • fit(train_df, y): 
+      * fit(train_df, y): 
           1) tries to load X_train.npy (already PCA-reduced) from disk; 
              if missing, calls build_features(...) → PCA internally
           2) trains self.clf = self._new_model().fit(X_train, y)
@@ -283,4 +286,59 @@ class LGBMFeatureExpert(FeatureExpert):
             subsample=0.9,
             colsample_bytree=0.9,
             objective="binary"
+        )
+
+
+class KNNFeatureExpert(FeatureExpert):
+    """
+    3 598-dim → K-Nearest Neighbors classifier (scikit-learn).
+    """
+    model_name = "KNNFeatureExpert"
+    model_path = Path("../models/custom/feature_knn.pkl")
+
+    def _new_model(self):
+        from sklearn.neighbors import KNeighborsClassifier
+        # You can tune n_neighbors or other parameters as needed
+        return KNeighborsClassifier(
+            n_neighbors=10,
+            weights="distance",
+            n_jobs=-1,
+        )
+
+
+class RFFeatureExpert(FeatureExpert):
+    """
+    3 598-dim → Random Forest classifier (scikit-learn).
+    """
+    model_name = "RFFeatureExpert"
+    model_path = Path("../models/custom/feature_rf.pkl")
+
+    def _new_model(self):
+        from sklearn.ensemble import RandomForestClassifier
+        return RandomForestClassifier(
+            n_estimators=200,
+            max_depth=None,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            n_jobs=-1,
+            random_state=13
+        )
+
+
+class SVMFeatureExpert(FeatureExpert):
+    """
+    3 598-dim → Support Vector Machine with probability estimates (scikit-learn).
+    """
+    model_name = "SVMFeatureExpert"
+    model_path = Path("../models/custom/feature_svm.pkl")
+
+    def _new_model(self):
+        from sklearn.svm import SVC
+        # `probability=True` enables predict_proba but costs extra computation
+        return SVC(
+            kernel="rbf",
+            C=1.0,
+            gamma="scale",
+            probability=True,
+            random_state=13,
         )

@@ -1,4 +1,4 @@
-# src/models.py
+# src/pretrained_models.py
 # -----------------------------------------------------------
 """
 Mixture-of-Experts for Quora Duplicate Question Pairs (QQP).
@@ -41,7 +41,7 @@ import torch
 import torch.nn as nn
 
 # Silence HuggingFace INFO logs
-logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers").setLevel(logging.WARN)
 
 # -----------------------------------------------------------------------------
 # helpers ---------------------------------------------------------------------
@@ -107,6 +107,7 @@ class BaseExpert:
         if not self._loaded:
             raise RuntimeError(f"{self.__class__.__name__} failed to load properly")
 
+
 # -----------------------------------------------------------------------------
 # 1) HF Sequence-classification experts (BERT / RoBERTa / optional XLNet) -------
 # -----------------------------------------------------------------------------
@@ -158,7 +159,7 @@ class _HFAutoExpert(BaseExpert):
                     last_exc = e
                     if attempt < 9:
                         print(
-                            f"[models.py] Warning: failed to load HF model/tokenizer "
+                            f"[pretrained_models.py] Warning: failed to load HF model/tokenizer "
                             f"'{self.model_name}' (attempt {attempt+1}/10). Retrying in 2s..."
                         )
                         time.sleep(2)
@@ -221,6 +222,7 @@ class XLNetExpert(_HFAutoExpert):
     model_name = "textattack/xlnet-base-cased-QQP"
     batch_size = 256   # increased from 128 -> 256 for faster inference
 
+
 # -----------------------------------------------------------------------------
 # 2) QuoraDistilExpert (Quora-trained DistilBERT + LogisticRegression) --------
 # -----------------------------------------------------------------------------
@@ -275,7 +277,7 @@ class QuoraDistilExpert(BaseExpert):
                     last_exc = e
                     if attempt < 9:
                         print(
-                            f"[models.py] Warning: failed to load SentenceTransformer "
+                            f"[pretrained_models.py] Warning: failed to load SentenceTransformer "
                             f"'distilbert-base-nli-stsb-quora-ranking' (attempt {attempt+1}/10). Retrying in 2s..."
                         )
                         time.sleep(2)
@@ -341,6 +343,7 @@ class QuoraDistilExpert(BaseExpert):
         prob = self.lr.predict_proba(X)[:, 1].astype("float32")
         return prob
 
+
 # -----------------------------------------------------------------------------
 # 3) Cross-Encoder expert (already returns [0,1]) ----------------------------
 # -----------------------------------------------------------------------------
@@ -374,7 +377,7 @@ class CrossEncExpert(BaseExpert):
                     last_exc = e
                     if attempt < 9:
                         print(
-                            f"[models.py] Warning: failed to load CrossEncoder "
+                            f"[pretrained_models.py] Warning: failed to load CrossEncoder "
                             f"'{self.model_name}' (attempt {attempt+1}/10). Retrying in 2s..."
                         )
                         time.sleep(2)
@@ -388,6 +391,7 @@ class CrossEncExpert(BaseExpert):
         # Note: CrossEncoder handles its own internal batching up to batch_size
         probs = self._model.predict(pairs, batch_size=self.batch_size)
         return probs.astype("float32")
+
 
 # -----------------------------------------------------------------------------
 # 4) Mixture-of-Experts (gate + weighted blend) --------------------------------
@@ -427,12 +431,17 @@ class MoEClassifier:
       .evaluate(pairs, y)    – return binary log-loss on given dataset
     """
 
-    def __init__(self, experts: List[BaseExpert], lr: float = 1e-2, epochs: int = 3):
+    def __init__(self, experts: List[BaseExpert], lr: float = 1e-2, epochs: int = 100):
         self.experts = experts
         self.epochs = epochs
         self.gate = _GateNet(len(experts)).to(_DEVICE)
         self.opt = torch.optim.Adam(self.gate.parameters(), lr=lr)
         self.loss_fn = nn.BCELoss()  # binary cross-entropy
+
+        # LR scheduler: reduce LR on plateau (monitor train loss)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.opt, mode="min", factor=0.5, patience=5, verbose=True
+        )
 
     def fit(self, pairs: List[Pair], y: np.ndarray):
         """
@@ -443,16 +452,16 @@ class MoEClassifier:
         Internally:
          - We randomly shuffle the pairs each epoch.
          - We process in “gate batch size” B=1024.
-         - For each gate-batch:
-             1. We call each expert’s `.predict_prob(batch_pairs)` under `torch.no_grad()`
-                -> we get a (batch_size × K) numpy array of expert P(duplicate).
-             2. We convert that to a (batch_size × K) torch.Tensor “probs_t”.
-             3. We compute `weights = gate(probs_t)`, then `blended = (weights * probs_t).sum(dim=1)`.
-             4. We compute BCELoss(blended, targets), backprop, and step the gate’s parameters.
+         - Early stopping if training log-loss hasn’t improved for 10 epochs.
+         - We use a ReduceLROnPlateau scheduler to decrease LR when plateaus occur.
          - We print the final loss of each epoch.
         """
         y_t = torch.tensor(y, dtype=torch.float32).to(_DEVICE)
         B = 1024  # gate batch size
+
+        best_loss = float("inf")
+        no_improve_count = 0
+        patience = 10  # early stopping patience
 
         for epoch in range(1, self.epochs + 1):
             perm = np.random.permutation(len(pairs))
@@ -481,7 +490,21 @@ class MoEClassifier:
 
                 epoch_loss = loss.item()
 
-            print(f"Epoch {epoch}/{self.epochs}  ·  loss {epoch_loss:.4f}")
+            # Scheduler step on the epoch's loss
+            self.scheduler.step(epoch_loss)
+
+            print(f"Epoch {epoch}/{self.epochs}  ·  loss {epoch_loss:.4f}  ·  lr {self.opt.param_groups[0]['lr']:.6f}")
+
+            # Early stopping check
+            if epoch_loss < best_loss - 1e-4:
+                best_loss = epoch_loss
+                no_improve_count = 0
+            else:
+                no_improve_count += 1
+
+            if no_improve_count >= patience:
+                print(f"[MoEClassifier] Early stopping at epoch {epoch} (no improvement for {patience} epochs).")
+                break
 
     @torch.no_grad()
     def predict_prob(self, pairs: List[Pair]) -> np.ndarray:
@@ -506,6 +529,7 @@ class MoEClassifier:
         from sklearn.metrics import log_loss
         p = self.predict_prob(pairs)
         return log_loss(y, p)
+
 
 # -----------------------------------------------------------------------------
 # 5) Convenience factory to instantiate all desired experts ---------------
@@ -560,8 +584,9 @@ def default_experts(
 
     return exps
 
+
 # -----------------------------------------------------------------------------
-# --- append to the end of src/models.py -------------------------------------
+# --- append to the end of src/pretrained_models.py -------------------------------------
 # -----------------------------------------------------------------------------
 import hashlib
 import json
