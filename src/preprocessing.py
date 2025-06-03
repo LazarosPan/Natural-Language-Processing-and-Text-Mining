@@ -4,7 +4,7 @@
 """
 • Porter‐stem + stop‐word cleaning
 • Sentence‐Transformer bi‐encoder caching
-  (Quora‐fine‐tuned DistilBERT by default, GPU‐aware)
+  (supports multiple models; Quora‐fine‑tuned DistilBERT by default)
 
 PUBLIC API
 ----------
@@ -20,7 +20,7 @@ import unicodedata
 import math
 import hashlib
 from functools import lru_cache
-from typing import List
+from typing import List, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -131,7 +131,7 @@ def _cache_name(model_name: str) -> str:
 
 def build_st_embeddings(
     corpus      : List[str],
-    model_name  : str = "sentence-transformers/distilbert-base-nli-stsb-quora-ranking",
+    model_name  : str | Sequence[str] = "sentence-transformers/distilbert-base-nli-stsb-quora-ranking",
     cache_dir   : str = "models",
     batch_size  : int = 512,
     out_fp      : str | None = None
@@ -157,8 +157,9 @@ def build_st_embeddings(
     ---------
     corpus      : List[str]
                   List of cleaned question strings of length N_q.
-    model_name  : str
-                  HuggingFace model identifier (default is Quora‐fine‐tuned DistilBERT).
+    model_name  : str | Sequence[str]
+                  Single model name or list of names. Each model is cached individually.
+                  Default is Quora‐fine‐tuned DistilBERT.
     cache_dir   : str
                   Directory to cache the hashed embedding file.
     batch_size  : int
@@ -169,10 +170,24 @@ def build_st_embeddings(
     Returns
     -------
     emb : np.ndarray, dtype=float32, shape = (N_q, embedding_dim)
-          Embedding dimension is 768 when using Quora DistilBERT.
+          `embedding_dim` depends on the model(s): 768 for base models,
+          384 for MiniLM variants, or the sum when multiple models are used.
     """
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
+
+    # If user passed multiple models, build each then concatenate
+    if isinstance(model_name, Sequence) and not isinstance(model_name, (str, bytes)):
+        embeddings = [
+            build_st_embeddings(corpus, m, cache_dir=cache_dir, batch_size=batch_size)
+            for m in model_name
+        ]
+        emb = np.hstack(embeddings).astype("float32")
+        if out_fp is not None:
+            out_path = Path(out_fp)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(out_path, emb)
+        return emb
 
     # Compute the hashed filename under cache_dir
     fp = cache_path / _cache_name(model_name)
