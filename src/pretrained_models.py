@@ -440,7 +440,7 @@ class MoEClassifier:
 
         # LR scheduler: reduce LR on plateau (monitor train loss)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.opt, mode="min", factor=0.5, patience=5, verbose=True
+            self.opt, mode="min", factor=0.5, patience=5
         )
 
     def fit(self, pairs: List[Pair], y: np.ndarray):

@@ -327,18 +327,25 @@ class RFFeatureExpert(FeatureExpert):
 
 class SVMFeatureExpert(FeatureExpert):
     """
-    3 598-dim → Support Vector Machine with probability estimates (scikit-learn).
+    3 598-dim → linear SVM with probability calibration (fast on high-dim data).
     """
     model_name = "SVMFeatureExpert"
     model_path = Path("../models/custom/feature_svm.pkl")
 
     def _new_model(self):
-        from sklearn.svm import SVC
-        # `probability=True` enables predict_proba but costs extra computation
-        return SVC(
-            kernel="rbf",
+        from sklearn.svm import LinearSVC
+        from sklearn.calibration import CalibratedClassifierCV
+
+        # 1) Use a linear SVM (LinearSVC) for speed on high-dimensional inputs.
+        base_svc = LinearSVC(
             C=1.0,
-            gamma="scale",
-            probability=True,
+            max_iter=5_000,       # increase if it doesn’t converge
             random_state=13,
+        )
+        # 2) Wrap in CalibratedClassifierCV to get .predict_proba(...)
+        #    “cv=3” will hold out 1/3 of the train set for calibration.
+        return CalibratedClassifierCV(
+            estimator=base_svc,
+            cv=3,
+            method="sigmoid",     # faster & usually fine for our use case
         )

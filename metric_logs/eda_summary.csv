@@ -1,0 +1,13 @@
+metric,value
+train rows,323613
+dup count,119283
+non-dup count,204330
+dup ratio,36.860%
+mean q1 chars,59.7
+mean q2 chars,60.5
+mean q1 words,11.0
+mean q2 words,11.3
+mean len_diff,20.3
+mean Jaccard,0.387
+mean cosine TF-IDF,0.520
+"corr(min_freq, is_dup)",0.406
