@@ -5,6 +5,16 @@
 • Porter‐stem + stop‐word cleaning
 • Sentence‐Transformer bi‐encoder caching
   (supports multiple models; Quora‐fine‑tuned DistilBERT by default)
+  Recommended models include:
+    384‑dim  → sentence-transformers/all-MiniLM-L6-v2,
+                sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2,
+                sentence-transformers/all-MiniLM-L12-v2,
+                BAAI/bge-small-en-v1.5
+    768‑dim  → sentence-transformers/all-mpnet-base-v2,
+                BAAI/bge-base-en-v1.5,
+                cross-encoder/quora-roberta-base,
+                cross-encoder/quora-distilroberta-base,
+                sentence-transformers/distilbert-base-nli-stsb-quora-ranking
 
 PUBLIC API
 ----------
