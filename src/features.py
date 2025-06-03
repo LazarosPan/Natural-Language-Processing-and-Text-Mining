@@ -8,16 +8,19 @@ then applies an IncrementalPCA step to reduce dimensionality while retaining
 
 BLOCKS
   A  2 × TF-IDF cosine (word & char)                               -> 2   cols
-  B  Quora-DistilBERT pair-vector (u, v, |u−v|, u·v) (768-dim each) -> 4×768 = 3072 cols
+  B  Sentence-embedding pair-vector (u, v, |u−v|, u·v).
+     Embedding dim may be 768 (e.g. DistilBERT/MPNet) or 384 for MiniLM models.
+     The block size is 4×dim.
   C  RapidFuzz lexical + length diffs                              -> 4   cols
   D  Jaccard token overlap                                         -> 1   col
   E  Numeric “magic” features (len_q1, len_q2, len_diff buckets, freq) -> 18 cols
   F  Quora Cross-Encoder duplicate probability                      -> 1   col
   G  TF-IDF SVD reduction (150 & 100 dims per side)                 -> 500 cols
 
-  -> raw concatenated feature‐vector has 2 + 3072 + 4 + 1 + 18 + 1 + 500 = 3598 dims.
+  -> raw concatenated feature‐vector has:
+       2 + (4×dim) + 4 + 1 + 18 + 1 + 500 = 526 + 4×dim dimensions.
 
-After assembling the 3598-dim matrix, we apply **IncrementalPCA** in two passes:
+After assembling this high-dimensional matrix, we apply **IncrementalPCA** in two passes:
   1. In TRAIN mode (fit_pca=True): 
        -  first pass with IncrementalPCA(n_components=None) to compute explained_variance_ratio_
        -  derive `k95` = #components needed for 95% variance
@@ -26,7 +29,7 @@ After assembling the 3598-dim matrix, we apply **IncrementalPCA** in two passes:
   2. In VALID/TEST mode (fit_pca=False):
        -  load `cache_dir/pca_95.pkl` and just transform any new X_raw 
 
-Total return dimension: (n_pairs, k95)  with k95 ≪ 3598.
+Total return dimension: (n_pairs, k95)  with k95 ≪ 526 + 4×dim.
 """
 
 from __future__ import annotations
@@ -357,21 +360,23 @@ def build_features(
     n_components    : int | None = None,
 ) -> np.ndarray:
     """
-    Build the full (n_pairs × 3598) feature matrix, then optionally apply
-    dimensionality reduction via IncrementalPCA and/or UMAP. Results can be
-    cached to disk for reuse.
+    Build the full feature matrix of size (n_pairs × (526 + 4×dim)), then
+    optionally apply dimensionality reduction via IncrementalPCA and/or UMAP.
+    Results can be cached to disk for reuse.
 
     Arguments
     ---------
     pair_df: DataFrame with columns ['qid1','qid2','question1','question2'].
     clean_questions: List[str] of length = n_unique_questions.
     meta_df: DataFrame from question_meta.csv (contains at least 'len').
-    embedding_path: path -> (n_questions×768) .npy file of DistilBERT embeddings.
+    embedding_path: path -> (n_questions×dim) .npy file of sentence embeddings,
+        where `dim` is typically 768 (DistilBERT/MPNet) or 384 for MiniLM models.
     cache_dir: directory where TF-IDF/SVD/PCA models live.
     cross_cache: optional path -> .npy of cached cross-encoder scores; if None, recompute.
     fit_pca: if True, (re)fit the dimensionality-reduction model(s).
              If False, load from cache_dir.
-    features_cache: optional path to save/load the raw 3598-dim features.
+    features_cache: optional path to save/load the raw feature matrix
+                    before dimensionality reduction.
     reduction: 'ipca' | 'umap' | 'pca_umap'.
     n_components: target dimension after reduction. If None and reduction='ipca'
                   the PCA 95%%-variance heuristic is used.
@@ -422,8 +427,8 @@ def build_features(
     # ───────────────────────────────────────────────────────────────────
     # C. QUORA-DISTILBERT PAIR-VECTOR
     # ───────────────────────────────────────────────────────────────────
-    emb         = np.load(embedding_path, mmap_mode="r")  # (n_q, 768)
-    dense_block = _dense_pair(emb, idx1, idx2)            # (n_pairs, 3072)
+    emb         = np.load(embedding_path, mmap_mode="r")  # (n_q, dim)
+    dense_block = _dense_pair(emb, idx1, idx2)            # (n_pairs, 4*dim)
 
     # ───────────────────────────────────────────────────────────────────
     # D. FUZZY / LENGTH DIFFS
@@ -462,7 +467,7 @@ def build_features(
     ).reshape(-1, 1)  # (n_pairs, 1)
 
     # ───────────────────────────────────────────────────────────────────
-    # CONCAT raw 3 598-dim features
+    # CONCAT raw feature blocks
     # ───────────────────────────────────────────────────────────────────
     X_raw = np.hstack([
         cos_block,      # 2
@@ -472,7 +477,7 @@ def build_features(
         numeric_block,  # 18
         cross_block,    # 1
         svd_block       # 500
-    ]).astype("float32")  # -> (n_pairs, 3598)
+    ]).astype("float32")  # -> (n_pairs, 526 + 4*dim)
 
     if features_cache:
         fp = Path(features_cache)
