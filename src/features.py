@@ -33,7 +33,23 @@ from __future__ import annotations
 import re, joblib, numpy as np, pandas as pd, scipy.sparse as sp
 from pathlib import Path
 from typing import List, Tuple
+from datetime import datetime
 import torch
+
+try:
+    import umap.umap_ as umap
+except Exception:  # pragma: no cover - optional dependency
+    umap = None
+
+_METRIC_DIR = Path("../metric_logs")
+_METRIC_DIR.mkdir(parents=True, exist_ok=True)
+
+def _log_metric(file: str, msg: str) -> None:
+    """Append a timestamped line to metric_logs/<file>."""
+    fp = _METRIC_DIR / file
+    with open(fp, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.utcnow().isoformat()}\t{msg}\n")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # A. JACCARD HELPER (token-level)
@@ -335,11 +351,15 @@ def build_features(
     embedding_path  : str = "../data/processed/question_embeddings.npy",
     cache_dir       : str = "../models/features",
     cross_cache     : str | None = "../data/processed/train_cross_scores.npy",
-    fit_pca         : bool = False
+    fit_pca         : bool = False,
+    features_cache  : str | None = None,
+    reduction       : str = "ipca",
+    n_components    : int | None = None,
 ) -> np.ndarray:
     """
-    Build the full (n_pairs × 3598) feature matrix, then optionally apply IncrementalPCA
-    to retain 95% of the variance.
+    Build the full (n_pairs × 3598) feature matrix, then optionally apply
+    dimensionality reduction via IncrementalPCA and/or UMAP. Results can be
+    cached to disk for reuse.
 
     Arguments
     ---------
@@ -349,15 +369,18 @@ def build_features(
     embedding_path: path -> (n_questions×768) .npy file of DistilBERT embeddings.
     cache_dir: directory where TF-IDF/SVD/PCA models live.
     cross_cache: optional path -> .npy of cached cross-encoder scores; if None, recompute.
-    fit_pca: if True, do a two‐pass IncrementalPCA on the assembled 3598-dim matrix:
-               - first pass to compute explained_variance_ratio_ -> find k95 
-               - second pass to fit and transform X_raw -> X_red of shape (n_pairs,k95)
-             If False, load “cache_dir/pca_95.pkl” and transform X_raw.
+    fit_pca: if True, (re)fit the dimensionality-reduction model(s).
+             If False, load from cache_dir.
+    features_cache: optional path to save/load the raw 3598-dim features.
+    reduction: 'ipca' | 'umap' | 'pca_umap'.
+    n_components: target dimension after reduction. If None and reduction='ipca'
+                  the PCA 95%%-variance heuristic is used.
 
     Returns
     -------
-    X_red: np.ndarray of shape (n_pairs, k95), dtype float32,
-           where k95 is the # of components needed for 95% variance.
+    X_red: np.ndarray of shape (n_pairs, n_components). When n_components is
+           None with reduction='ipca', the output dimension equals the number of
+           components needed for 95% explained variance.
     """
     # 1) Extract pair indices
     idx1 = pair_df.qid1.values.astype("int32")
@@ -451,42 +474,93 @@ def build_features(
         svd_block       # 500
     ]).astype("float32")  # -> (n_pairs, 3598)
 
+    if features_cache:
+        fp = Path(features_cache)
+        if fit_pca and not fp.exists():
+            np.save(fp, X_raw)
+            _log_metric("feature_engineering.txt", f"saved raw features to {fp}")
+        elif fp.exists():
+            X_raw = np.load(fp, mmap_mode="r")
+            _log_metric("feature_engineering.txt", f"loaded raw features from {fp}")
+
     # ───────────────────────────────────────────────────────────────────
-    # H. INCREMENTAL PCA REDUCTION (95% variance)
+    # Dimensionality reduction
     # ───────────────────────────────────────────────────────────────────
-    pca_fp = cache / "pca_95.pkl"
+    red = reduction.lower()
 
-    if fit_pca:
-        # ─────────────────────────────────────────────────────────────────────
-        # 1) First pass: learn explained_variance_ratio_ -> find k95
-        # ─────────────────────────────────────────────────────────────────────
-        print("  [features.py]  1st pass of IncrementalPCA(n_components=None) to compute variance…")
-        ipca_full = IncrementalPCA(n_components=None)
+    if red == "ipca":
+        if n_components is None:
+            pca_fp = cache / "pca_95.pkl"
+        else:
+            pca_fp = cache / f"ipca_{n_components}.pkl"
 
-        # Partial‐fit on entire X_raw (it’s in memory, so this is one “batch” here)
-        ipca_full.fit(X_raw)  
-        cumvar = np.cumsum(ipca_full.explained_variance_ratio_)
-        k95 = int(np.searchsorted(cumvar, 0.95)) + 1
-        print(f"  [features.py]  #components -> {k95} to retain 95% variance")
-
-        # ─────────────────────────────────────────────────────────────────────
-        # 2) Second pass: fit + transform with fixed n_components = k95
-        # ─────────────────────────────────────────────────────────────────────
-        print("  [features.py]  2nd pass of IncrementalPCA(n_components=k95) to fit_transform…")
-        ipca = IncrementalPCA(n_components=k95)
-        X_red = ipca.fit_transform(X_raw).astype("float32")
-
-        # 3) Save the fitted IncrementalPCA
-        joblib.dump(ipca, pca_fp)
+        if fit_pca or not pca_fp.exists():
+            start = time.time()
+            if n_components is None:
+                ipca_full = IncrementalPCA(n_components=None)
+                ipca_full.fit(X_raw)
+                cumvar = np.cumsum(ipca_full.explained_variance_ratio_)
+                k95 = int(np.searchsorted(cumvar, 0.95)) + 1
+                ipca = IncrementalPCA(n_components=k95)
+            else:
+                ipca = IncrementalPCA(n_components=n_components)
+            X_red = ipca.fit_transform(X_raw).astype("float32")
+            joblib.dump(ipca, pca_fp)
+            _log_metric("feature_engineering.txt", f"fit IPCA -> {X_red.shape[1]} dims in {time.time()-start:.1f}s")
+        else:
+            ipca = joblib.load(pca_fp)
+            X_red = ipca.transform(X_raw).astype("float32")
+            _log_metric("feature_engineering.txt", f"loaded IPCA model {pca_fp}")
         return X_red
 
-    # ───────────────────────────────────────────────────────────────────
-    # Otherwise (VALID/TEST): load PCA & transform
-    # ───────────────────────────────────────────────────────────────────
-    if not pca_fp.exists():
-        raise RuntimeError(
-            "PCA model not found in cache. Run build_features(..., fit_pca=True) on TRAIN first."
-        )
-    ipca = joblib.load(pca_fp)
-    X_red = ipca.transform(X_raw).astype("float32")
-    return X_red
+    if red == "umap":
+        if umap is None:
+            raise RuntimeError("umap-learn package is required for reduction='umap'")
+        if n_components is None:
+            raise ValueError("n_components must be specified for UMAP reduction")
+        umap_fp = cache / f"umap_{n_components}.pkl"
+        if fit_pca or not umap_fp.exists():
+            start = time.time()
+            reducer = umap.UMAP(n_components=n_components, random_state=42)
+            X_red = reducer.fit_transform(X_raw).astype("float32")
+            joblib.dump(reducer, umap_fp)
+            _log_metric("feature_engineering.txt", f"fit UMAP -> {n_components} dims in {time.time()-start:.1f}s")
+        else:
+            reducer = joblib.load(umap_fp)
+            X_red = reducer.transform(X_raw).astype("float32")
+            _log_metric("feature_engineering.txt", f"loaded UMAP model {umap_fp}")
+        return X_red
+
+    if red == "pca_umap":
+        if umap is None:
+            raise RuntimeError("umap-learn package is required for reduction='pca_umap'")
+        if n_components is None:
+            raise ValueError("n_components must be specified for PCA+UMAP reduction")
+        pca_fp = cache / "pca_95.pkl"
+        umap_fp = cache / f"pca_umap_{n_components}.pkl"
+        if fit_pca or not (pca_fp.exists() and umap_fp.exists()):
+            start = time.time()
+            ipca_full = IncrementalPCA(n_components=None)
+            ipca_full.fit(X_raw)
+            cumvar = np.cumsum(ipca_full.explained_variance_ratio_)
+            k95 = int(np.searchsorted(cumvar, 0.95)) + 1
+            ipca = IncrementalPCA(n_components=k95)
+            X_ipca = ipca.fit_transform(X_raw)
+            joblib.dump(ipca, pca_fp)
+
+            reducer = umap.UMAP(n_components=n_components, random_state=42)
+            X_red = reducer.fit_transform(X_ipca).astype("float32")
+            joblib.dump(reducer, umap_fp)
+            _log_metric(
+                "feature_engineering.txt",
+                f"fit PCA({k95})+UMAP({n_components}) in {time.time()-start:.1f}s",
+            )
+        else:
+            ipca = joblib.load(pca_fp)
+            reducer = joblib.load(umap_fp)
+            X_ipca = ipca.transform(X_raw)
+            X_red = reducer.transform(X_ipca).astype("float32")
+            _log_metric("feature_engineering.txt", f"loaded PCA+UMAP models")
+        return X_red
+
+    raise ValueError(f"Unknown reduction='{reduction}'")
