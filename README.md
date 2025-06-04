@@ -148,7 +148,7 @@ xgboost
 lightgbm
 torch
 umap-learn
-fuzzywuzzy
+rapidfuzz
 networkx
 ```
 

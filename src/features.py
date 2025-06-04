@@ -229,7 +229,6 @@ def _numeric(
 # ─────────────────────────────────────────────────────────────────────────────
 # G. CROSS‐ENCODER PROBABILITY BLOCK
 # ─────────────────────────────────────────────────────────────────────────────
-import time
 from sentence_transformers import CrossEncoder  # type: ignore
 
 _CROSS_CACHE: dict[str, CrossEncoder] = {}
