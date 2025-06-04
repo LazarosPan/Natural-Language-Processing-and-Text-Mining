@@ -1,51 +1,51 @@
-2025-06-03 22:19:11,<frozen runpy>,pid=9579,eda=class_balance,dup_count=119283,nondup_count=204330,dup_ratio=36.860%
-2025-06-03 22:19:11,<frozen runpy>,pid=9579,eda=char_length,mean_q1_len=59.7,mean_q2_len=60.5
-2025-06-03 22:19:11,<frozen runpy>,pid=9579,eda=word_count,mean_q1_words=11.0,mean_q2_words=11.3
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=best,freq=5714
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=does,freq=4421
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=india,freq=2239
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=people,freq=2084
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=good,freq=2020
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=like,freq=2010
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=make,freq=1497
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=way,freq=1493
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=quora,freq=1460
-2025-06-03 22:19:12,<frozen runpy>,pid=9579,eda=top_word,word=did,freq=1407
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=cosine_similarity,mean_cosine=0.520,std_cosine=0.298
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=jaccard_overlap,mean_jaccard=0.387
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=corr_with_dup,feature=cosine_similarity,corr=0.389
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=corr_with_dup,feature=q1_len,corr=-0.179
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=corr_with_dup,feature=q2_len,corr=-0.168
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=corr_with_dup,feature=q2_words,corr=-0.167
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=corr_with_dup,feature=q1_words,corr=-0.160
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=1,len_diff_range=(-0.001, 2.0],dup_ratio=0.458
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=2,len_diff_range=(2.0, 3.0],dup_ratio=0.456
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=3,len_diff_range=(3.0, 6.0],dup_ratio=0.461
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=4,len_diff_range=(6.0, 8.0],dup_ratio=0.444
-2025-06-03 22:19:17,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=5,len_diff_range=(8.0, 12.0],dup_ratio=0.428
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=6,len_diff_range=(12.0, 16.0],dup_ratio=0.402
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=7,len_diff_range=(16.0, 22.0],dup_ratio=0.369
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=8,len_diff_range=(22.0, 31.0],dup_ratio=0.323
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=9,len_diff_range=(31.0, 50.0],dup_ratio=0.236
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_len_diff,decile=10,len_diff_range=(50.0, 1011.0],dup_ratio=0.103
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=summary_table,summary_file=/home/lazar/Documents/1) Μεταπτυχιακό/2nd Semester/NLP/Natural-Language-Processing-and-Text-Mining/metric_logs/eda_summary.csv
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_min_freq,quartile=1,freq_range=(0.999, 2.0],dup_ratio=0.253
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_min_freq,quartile=2,freq_range=(2.0, 51.0],dup_ratio=0.866
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=1,sim_range=(-0.001, 0.247],dup_ratio=0.053
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=2,sim_range=(0.247, 0.36],dup_ratio=0.242
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=3,sim_range=(0.36, 0.45],dup_ratio=0.340
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=4,sim_range=(0.45, 0.536],dup_ratio=0.400
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=5,sim_range=(0.536, 0.623],dup_ratio=0.474
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=6,sim_range=(0.623, 0.717],dup_ratio=0.503
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=7,sim_range=(0.717, 0.805],dup_ratio=0.481
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=8,sim_range=(0.805, 0.909],dup_ratio=0.480
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_cosine_similarity_decile,decile=9,sim_range=(0.909, 1.0],dup_ratio=0.681
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=1,sim_range=(-0.001, 0.143],dup_ratio=0.019
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=2,sim_range=(0.143, 0.2],dup_ratio=0.183
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=3,sim_range=(0.2, 0.286],dup_ratio=0.365
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=4,sim_range=(0.286, 0.333],dup_ratio=0.451
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=5,sim_range=(0.333, 0.429],dup_ratio=0.543
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=6,sim_range=(0.429, 0.5],dup_ratio=0.544
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=7,sim_range=(0.5, 0.667],dup_ratio=0.525
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=8,sim_range=(0.667, 0.75],dup_ratio=0.461
-2025-06-03 22:19:18,<frozen runpy>,pid=9579,eda=dup_rate_by_jaccard_decile,decile=9,sim_range=(0.75, 1.0],dup_ratio=0.637
+2025-06-04 01:54:53,<frozen runpy>,pid=25464,eda=class_balance,dup_count=119283,nondup_count=204330,dup_ratio=36.860%
+2025-06-04 01:54:53,<frozen runpy>,pid=25464,eda=char_length,mean_q1_len=59.7,mean_q2_len=60.5
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=word_count,mean_q1_words=11.0,mean_q2_words=11.3
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=best,freq=5714
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=does,freq=4421
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=india,freq=2239
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=people,freq=2084
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=good,freq=2020
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=like,freq=2010
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=make,freq=1497
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=way,freq=1493
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=quora,freq=1460
+2025-06-04 01:54:54,<frozen runpy>,pid=25464,eda=top_word,word=did,freq=1407
+2025-06-04 01:54:59,<frozen runpy>,pid=25464,eda=cosine_similarity,mean_cosine=0.520,std_cosine=0.298
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=jaccard_overlap,mean_jaccard=0.387
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=corr_with_dup,feature=cosine_similarity,corr=0.389
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=corr_with_dup,feature=q1_len,corr=-0.179
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=corr_with_dup,feature=q2_len,corr=-0.168
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=corr_with_dup,feature=q2_words,corr=-0.167
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=corr_with_dup,feature=q1_words,corr=-0.160
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=1,len_diff_range=(-0.001, 2.0],dup_ratio=0.458
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=2,len_diff_range=(2.0, 3.0],dup_ratio=0.456
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=3,len_diff_range=(3.0, 6.0],dup_ratio=0.461
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=4,len_diff_range=(6.0, 8.0],dup_ratio=0.444
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=5,len_diff_range=(8.0, 12.0],dup_ratio=0.428
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=6,len_diff_range=(12.0, 16.0],dup_ratio=0.402
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=7,len_diff_range=(16.0, 22.0],dup_ratio=0.369
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=8,len_diff_range=(22.0, 31.0],dup_ratio=0.323
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=9,len_diff_range=(31.0, 50.0],dup_ratio=0.236
+2025-06-04 01:55:00,<frozen runpy>,pid=25464,eda=dup_rate_by_len_diff,decile=10,len_diff_range=(50.0, 1011.0],dup_ratio=0.103
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=summary_table,summary_file=/home/lazar/Documents/1) Μεταπτυχιακό/2nd Semester/NLP/Natural-Language-Processing-and-Text-Mining/metric_logs/eda_summary.csv
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_min_freq,quartile=1,freq_range=(0.999, 2.0],dup_ratio=0.253
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_min_freq,quartile=2,freq_range=(2.0, 51.0],dup_ratio=0.866
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=1,sim_range=(-0.001, 0.247],dup_ratio=0.053
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=2,sim_range=(0.247, 0.36],dup_ratio=0.242
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=3,sim_range=(0.36, 0.45],dup_ratio=0.340
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=4,sim_range=(0.45, 0.536],dup_ratio=0.400
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=5,sim_range=(0.536, 0.623],dup_ratio=0.474
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=6,sim_range=(0.623, 0.717],dup_ratio=0.503
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=7,sim_range=(0.717, 0.805],dup_ratio=0.481
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=8,sim_range=(0.805, 0.909],dup_ratio=0.480
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_cosine_similarity_decile,decile=9,sim_range=(0.909, 1.0],dup_ratio=0.681
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=1,sim_range=(-0.001, 0.143],dup_ratio=0.019
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=2,sim_range=(0.143, 0.2],dup_ratio=0.183
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=3,sim_range=(0.2, 0.286],dup_ratio=0.365
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=4,sim_range=(0.286, 0.333],dup_ratio=0.451
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=5,sim_range=(0.333, 0.429],dup_ratio=0.543
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=6,sim_range=(0.429, 0.5],dup_ratio=0.544
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=7,sim_range=(0.5, 0.667],dup_ratio=0.525
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=8,sim_range=(0.667, 0.75],dup_ratio=0.461
+2025-06-04 01:55:01,<frozen runpy>,pid=25464,eda=dup_rate_by_jaccard_decile,decile=9,sim_range=(0.75, 1.0],dup_ratio=0.637

@@ -13,9 +13,19 @@ os.environ["USE_TF"]               = "0"   # transformers: disable TensorFlow
 os.environ["TRANSFORMERS_NO_TF"]   = "1"   # same effect (legacy flag)
 os.environ["TRANSFORMERS_NO_FLAX"] = "1"   # skip JAX / Flax
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"   # hide any residual TF C++ logs
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
-# Optionally mute protobuf warning spam
-warnings.filterwarnings("ignore", category=UserWarning)
+# -----------------------------------------------------------------------------
+# Mute protobuf / "GetPrototype" spam
+# -----------------------------------------------------------------------------
+# Filter out any UserWarning that mentions "GetPrototype"
+warnings.filterwarnings("ignore", message=".*GetPrototype.*", category=UserWarning)
+
+# Silence absl and google.protobuf loggers
+logging.getLogger("absl").setLevel(logging.ERROR)
+logging.getLogger("google.protobuf").setLevel(logging.ERROR)
+
+# Also suppress generic TensorFlow warnings just in case
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # -----------------------------------------------------------------------------

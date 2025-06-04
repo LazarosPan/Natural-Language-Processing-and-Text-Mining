@@ -4,11 +4,11 @@
 Mixture-of-Experts for Quora Duplicate Question Pairs (QQP).
 
 Current experts (if available):
-    - BertExpert      (textattack/bert-base-uncased-QQP)
-    - RobertaExpert   (howey/roberta-large-qqp)
-    - XLNetExpert     (textattack/xlnet-base-cased-QQP)  (requires sentencepiece)
+    - BertExpert        (textattack/bert-base-uncased-QQP)
+    - RobertaExpert     (howey/roberta-large-qqp)
+    - XLNetExpert       (textattack/xlnet-base-cased-QQP)  (requires sentencepiece)
     - QuoraDistilExpert (distilbert-base-nli-stsb-quora-ranking + LogisticRegression)
-    - CrossEncExpert  (cross-encoder/quora-roberta-large)
+    - CrossEncExpert    (cross-encoder/quora-roberta-large)
 
 A lightweight gating network (Linear -> Softmax) predicts weights w ∈ ℝᵏ per (q₁, q₂) pair;
 then MoE output probability = ∑ᵢ wᵢ · pᵢ.
@@ -40,14 +40,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-# Silence HuggingFace INFO logs
+# Force Transformers to operate (if needed) in offline mode:
+# os.environ["TRANSFORMERS_OFFLINE"] = "1"
+# Silence HuggingFace INFO logs:
 logging.getLogger("transformers").setLevel(logging.WARN)
 
 # -----------------------------------------------------------------------------
 # helpers ---------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-_CACHE  = Path("../models/.hf_cache")           # local cache for HF models
+_CACHE  = Path("../models/.hf_cache")  # local cache for HF models
 _CACHE.mkdir(parents=True, exist_ok=True)
 
 Pair = Tuple[str, str]  # a (question₁, question₂) tuple
@@ -228,7 +230,6 @@ class XLNetExpert(_HFAutoExpert):
 # -----------------------------------------------------------------------------
 class QuoraDistilExpert(BaseExpert):
     """
-    (Renamed from SBertExpert to reflect use of a Quora-fine-tuned DistilBERT)
     Uses Quora-trained DistilBERT (“distilbert-base-nli-stsb-quora-ranking”) to
     produce 768-dim embeddings, then a scikit-learn LogisticRegression on [|u−v|, u·v].
 
@@ -251,7 +252,7 @@ class QuoraDistilExpert(BaseExpert):
         lr_path: str,
     ):
         """
-        emb_path: file -> 'question_embeddings.npy' (float32 array shape=(n_questions, 768))
+        emb_path: file -> 'question_embeddings_768.npy' (float32 array shape=(n_questions, 768))
         lr_path : file -> 'quoradistil_lr.pkl'
         """
         self.emb_path = emb_path
@@ -273,15 +274,14 @@ class QuoraDistilExpert(BaseExpert):
                 last_exc = None
                 break
             except Exception as e:
-                if isinstance(e, ConnectionError) or isinstance(e, OSError):
+                if isinstance(e, (ConnectionError, OSError)) and attempt < 9:
                     last_exc = e
-                    if attempt < 9:
-                        print(
-                            f"[pretrained_models.py] Warning: failed to load SentenceTransformer "
-                            f"'distilbert-base-nli-stsb-quora-ranking' (attempt {attempt+1}/10). Retrying in 2s..."
-                        )
-                        time.sleep(2)
-                        continue
+                    print(
+                        f"[pretrained_models.py] Warning: failed to load SentenceTransformer "
+                        f"'distilbert-base-nli-stsb-quora-ranking' (attempt {attempt+1}/10). Retrying in 2s..."
+                    )
+                    time.sleep(2)
+                    continue
                 raise
         if last_exc is not None:
             raise last_exc
@@ -373,15 +373,14 @@ class CrossEncExpert(BaseExpert):
                 last_exc = None
                 break
             except Exception as e:
-                if isinstance(e, ConnectionError) or isinstance(e, OSError):
+                if isinstance(e, (ConnectionError, OSError)) and attempt < 9:
                     last_exc = e
-                    if attempt < 9:
-                        print(
-                            f"[pretrained_models.py] Warning: failed to load CrossEncoder "
-                            f"'{self.model_name}' (attempt {attempt+1}/10). Retrying in 2s..."
-                        )
-                        time.sleep(2)
-                        continue
+                    print(
+                        f"[pretrained_models.py] Warning: failed to load CrossEncoder "
+                        f"'{self.model_name}' (attempt {attempt+1}/10). Retrying in 2s..."
+                    )
+                    time.sleep(2)
+                    continue
                 raise
         if last_exc is not None:
             raise last_exc
@@ -535,7 +534,7 @@ class MoEClassifier:
 # 5) Convenience factory to instantiate all desired experts ---------------
 # -----------------------------------------------------------------------------
 def default_experts(
-    emb_path: str       = "data/processed/question_embeddings.npy",
+    emb_path: str       = "../data/processed/question_embeddings_768.npy",
     lr_path: str        = "../models/pretrained/quoradistil_lr.pkl",
     embed_lr_ready: bool = True
 ) -> List[BaseExpert]:
@@ -544,7 +543,7 @@ def default_experts(
       [BertExpert, RobertaExpert, (XLNetExpert if available), QuoraDistilExpert, CrossEncExpert]
 
     Arguments:
-      emb_path        : string path -> precomputed question_embeddings.npy (768-dim from Quora model)
+      emb_path        : string path -> precomputed question_embeddings_768.npy (768-dim from Quora DistilBERT)
       lr_path         : string path -> quoradistil_lr.pkl (LogisticRegression on 1536 features)
       embed_lr_ready  : if False, QuoraDistilExpert will not error if no lr_path exists;
                         you must call .fit() manually to train the LR.
@@ -625,8 +624,18 @@ def get_predictions(
         else:
             p = exp.predict_prob(pairs)
             np.save(fname, p)
+
+        # Catch errors early
+        if p.shape[0] != len(pairs):
+            raise ValueError(
+                f"[ERROR] {exp.__class__.__name__} returned {p.shape[0]} predictions "
+                f"but expected {len(pairs)} for split='{split_tag}'"
+            )
+
         cols.append(p)
+
     return np.column_stack(cols).astype("float32")
+
 
 def _subset_key(experts: list[BaseExpert]) -> str:
     """

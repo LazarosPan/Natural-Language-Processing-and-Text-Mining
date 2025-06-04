@@ -1,0 +1,2 @@
+2025-06-04 01:58:07,<frozen runpy>,pid=25608,model=sentence-transformers/all-mpnet-base-v2,dim=768,n=537359,seconds=81.431,saved=../data/processed/question_embeddings_768.npy
+2025-06-04 01:58:32,<frozen runpy>,pid=25608,model=sentence-transformers/all-MiniLM-L6-v2,dim=384,n=537359,seconds=19.57,saved=../data/processed/question_embeddings_384.npy

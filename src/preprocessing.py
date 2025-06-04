@@ -1,232 +1,221 @@
-# ────────────────────────────────────────────────────────────────
-# src/preprocessing.py
-# ----------------------------------------------------------------
-"""
-• Porter‐stem + stop‐word cleaning
-• Sentence‐Transformer bi‐encoder caching
-  (supports multiple models; Quora‐fine‑tuned DistilBERT by default)
-  Recommended models include:
-    384‑dim  → sentence-transformers/all-MiniLM-L6-v2,
-                sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2,
-                sentence-transformers/all-MiniLM-L12-v2,
-                BAAI/bge-small-en-v1.5
-    768‑dim  → sentence-transformers/all-mpnet-base-v2,
-                BAAI/bge-base-en-v1.5,
-                cross-encoder/quora-roberta-base,
-                cross-encoder/quora-distilroberta-base,
-                sentence-transformers/distilbert-base-nli-stsb-quora-ranking
-
-PUBLIC API
-----------
-clean_text(text)                → str
-clean_and_stats(text)           → (str, char_len, word_cnt)
-clean_series(pd.Series)         → list[str]
-build_st_embeddings(corpus, …)  → np.ndarray   (mmap‐cached)
-"""
-
 from __future__ import annotations
-import re
-import unicodedata
-import math
-import hashlib
-from functools import lru_cache
-from typing import List, Sequence
-from pathlib import Path
 
+"""src/preprocessing.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Utility functions for **text cleaning** and **Sentence‑Transformer embeddings**
+used throughout the NLP similarity pipeline.
+
+Improvements in this revision
+-----------------------------
+*  Robust *clean_text* pipeline (HTML / math tag removal, stop‑words, stemming).
+*  **SUPPORTED_EMB** registry -> choose models by desired output dimension.
+*  On‑disk cache keyed by SHA‑1 hash of the model name – avoids repeat encodes.
+*  Centralised runtime logging via :pyfunc:`src.logs.log_event` (PREPROCESSING).
+*  Returns char/word stats to align with most predictive signals found in
+       01_eda (e.g. negative correlation of length features with duplicates).
+
+Public API
+~~~~~~~~~~
+clean_text(text)                -> str
+clean_and_stats(text)           -> (str, char_len, word_cnt)
+clean_series(pd.Series)         -> list[str]
+build_st_embeddings(texts, …)   -> np.ndarray  `(n, dim)`
+"""
+
+###############################################################################
+# Standard library
+###############################################################################
+import hashlib
+import math
+import re
+import time
+import unicodedata
+from functools import lru_cache
+from pathlib import Path
+from typing import Iterable, List, Sequence
+
+###############################################################################
+# Third‑party
+###############################################################################
 import numpy as np
 import torch
 import nltk
+from sentence_transformers import SentenceTransformer  # type: ignore
 
-# ────────────────────────────────
-# 1. TEXT‐CLEANING UTILITIES
-# ────────────────────────────────
+###############################################################################
+# Project
+###############################################################################
+from src.logs import log_event, LogKind
 
-# Attempt to load NLTK English stopwords; if missing, download them.
+###############################################################################
+# 1. TEXT‑CLEANING HELPERS
+###############################################################################
+
+# Ensure stop‑words are available (first run may need to download)
 try:
-    _stop = nltk.corpus.stopwords.words("english")
-except LookupError:
+    _STOP = set(nltk.corpus.stopwords.words("english"))
+except LookupError:  # pragma: no cover – network I/O in CI skipped
     nltk.download("stopwords")
-    nltk.download("punkt")
-    _stop = nltk.corpus.stopwords.words("english")
+    _STOP = set(nltk.corpus.stopwords.words("english"))
 
-STOPWORDS = set(_stop)
-_STEMMER  = nltk.PorterStemmer()
+_STEMMER = nltk.PorterStemmer()
 
-# Precompile regex patterns for cleaning
-_MATH_RE   = re.compile(r"\[math].*?\[/math\]", re.IGNORECASE | re.DOTALL)
-_HTML_RE   = re.compile(r"<[^>]+>")
-_BAD_CHR   = re.compile(r"[^a-z0-9'? ]+")        # anything not a-z, 0-9, apostrophe, question mark, or space
-_TOKEN_RE  = re.compile(r"[a-z0-9']+|\?")        # tokens: alphanumeric+apostrophes or standalone question marks
+_MATH_RE = re.compile(r"\[math].*?\[/math]", re.I | re.S)
+_HTML_RE = re.compile(r"<[^>]+>")
+_BAD_CHR = re.compile(r"[^a-z0-9'? ]+")
+_TOKEN_RE = re.compile(r"[a-z0-9']+|\?")
 
-@lru_cache(maxsize=200_000)
-def _stem(tok: str) -> str:
-    """
-    Apply Porter stemming to a single token, with LRU cache to speed up repeated tokens.
-    """
-    return _STEMMER.stem(tok)
 
 def _ascii_lower(s: str) -> str:
-    """
-    Normalize Unicode → ASCII (NFKD), then lowercase.
-    This removes accents/diacritics and ensures purely ASCII lowercase text.
-    """
+    """Unicode -> ASCII (NFKD) then lowercase."""
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii").lower()
 
-def clean_text(text: str | None) -> str:
-    """
-    Clean a single question string:
-      1. Handle None / NaN → return empty string
-      2. Unicode normalize & lowercase
-      3. Remove [math]...[/math] blocks & strip out HTML tags
-      4. Replace all non-[a-z0-9'? ] characters with spaces
-      5. Tokenize via regex (tokens are [a-z0-9']+ or '?')
-      6. Drop NLTK English stopwords
-      7. Porter‐stem each token (cached via lru_cache)
-      8. Join tokens with single spaces into a cleaned string
 
-    Returns:
-      A cleaned, stemmed string where tokens are separated by single spaces.
+@lru_cache(maxsize=200_000)
+def _stem(tok: str) -> str:  # pylint: disable=invalid-name
+    return _STEMMER.stem(tok)
+
+
+def clean_text(text: str | None) -> str:
+    """Return a cleaned + stemmed version of *text* suitable for TF‑IDF / SBERT.
+
+    Steps
+    -----
+    1. Handle *None* / *NaN*.
+    2. Unicode normalisation + lowercase.
+    3. Strip `[math]…[/math]` blocks and HTML tags.
+    4. Replace all non‑alnum punctuation with spaces.
+    5. Tokenise, drop stop‑words, apply Porter stemmer.
     """
     if text is None or (isinstance(text, float) and math.isnan(text)):
         return ""
 
-    # 1) Normalize to ASCII lowercase
+    # 1‑3) normalise + remove noise
     text = _ascii_lower(text)
-
-    # 2) Remove math blocks and HTML tags
     text = _MATH_RE.sub(" ", text)
     text = _HTML_RE.sub(" ", text)
-
-    # 3) Replace all “bad” characters with spaces
     text = _BAD_CHR.sub(" ", text)
 
-    # 4) Tokenize and drop stopwords → stem
+    # 4‑5) tokenise + filter
     tokens = _TOKEN_RE.findall(text)
-    cleaned = [_stem(tok) for tok in tokens if tok not in STOPWORDS]
+    tokens = [_stem(t) for t in tokens if t not in _STOP]
+    return " ".join(tokens)
 
-    return " ".join(cleaned)
 
 def clean_and_stats(text: str | None) -> tuple[str, int, int]:
-    """
-    Clean a single question and return:
-      ( cleaned_string, char_length_of_cleaned, word_count_of_cleaned )
+    """Clean *text* and return `(cleaned, char_len, word_cnt)` as used in EDA."""
+    cleaned = clean_text(text)
+    return cleaned, len(cleaned), len(cleaned.split())
 
-    - cleaned_string: result of clean_text(text)
-    - char_length_of_cleaned: len(cleaned_string)
-    - word_count_of_cleaned: number of tokens in cleaned_string
-    """
-    c = clean_text(text)
-    return c, len(c), len(c.split())
 
-def clean_series(series) -> List[str]:
-    """
-    Vectorised wrapper: given a pandas Series of raw question strings,
-    return a Python list of cleaned strings (using clean_text).
-    """
+def clean_series(series) -> List[str]:  # type: ignore[valid-type]
+    """Vectorised convenience wrapper for pandas Series -> list[str]."""
     return [clean_text(x) for x in series.tolist()]
 
+###############################################################################
+# 2. SENTENCE‑TRANSFORMER EMBEDDINGS
+###############################################################################
 
-# ────────────────────────────────
-# 2. BI‐ENCODER EMBEDDINGS CACHE
-# ────────────────────────────────
+# Recommended back‑bones keyed by output dimensionality
+SUPPORTED_EMB: dict[int, str] = {
+    384: "sentence-transformers/all-MiniLM-L6-v2",
+    768: "sentence-transformers/all-mpnet-base-v2",  # quora‑friendly, strong quality
+}
 
-def _cache_name(model_name: str) -> str:
-    """
-    Deterministic cache filename (first 8 hex of SHA1) based on `model_name`.
-    Example: "sentence-transformers/distilbert-base-nli-stsb-quora-ranking"
-             → "st_ab12cd34.npy"
-    """
+
+def _resolve_model(target_dim: int | None, model_name: str | None) -> str:
+    if model_name is not None:
+        return model_name
+    if target_dim is None:
+        raise ValueError("Either target_dim or model_name must be supplied")
+    try:
+        return SUPPORTED_EMB[target_dim]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unsupported target_dim={target_dim}. Choose one of {list(SUPPORTED_EMB)}"
+        ) from exc
+
+
+def _cache_name(model_name: str) -> Path:
+    """Return `<cache_dir>/st_<sha8>.npy` based on *model_name*."""
     h = hashlib.sha1(model_name.encode()).hexdigest()[:8]
-    return f"st_{h}.npy"
+    return Path(f"st_{h}.npy")
+
 
 def build_st_embeddings(
-    corpus      : List[str],
-    model_name  : str | Sequence[str] = "sentence-transformers/distilbert-base-nli-stsb-quora-ranking",
-    cache_dir   : str = "models",
-    batch_size  : int = 512,
-    out_fp      : str | None = None
+    texts: Iterable[str],
+    *,
+    target_dim: int | None = 768,
+    model_name: str | None = None,
+    cache_dir: str | Path = "models",  # relative to repo root
+    batch_size: int = 128,
+    normalize: bool = True,
+    save_path: str | Path | None = None,
 ) -> np.ndarray:
+    """Encode *texts* into SBERT embeddings with transparent on‑disk caching.
+
+    This wrapper **adds logging** and a dim->model registry on top of
+    :pyclass:`sentence_transformers.SentenceTransformer`.
     """
-    Encode each cleaned sentence in `corpus` into a dense Sentence-Transformer embedding.
 
-    On first run:
-      • Downloads `model_name` from Hugging Face
-      • Encodes in batches (batch_size) on GPU if available
-      • Normalizes embeddings to unit length (L2)
-      • Saves resulting float32 array to disk: <cache_dir>/st_<sha8>.npy
+    texts = list(texts)  # may be generator; we need len() twice
+    model_name = _resolve_model(target_dim, model_name)
 
-    On subsequent runs:
-      • Memory‐map loads (<cache_dir>/st_<sha8>.npy) to return a read‐only view.
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_fp = cache_dir / _cache_name(model_name)
 
-    Optionally, with `out_fp` provided:
-      • Also write the same embedding matrix (float32) to `out_fp`.
-      This is useful for “canonical” downstream file locations
-      (e.g., "data/processed/question_embeddings.npy").
-
-    Arguments
-    ---------
-    corpus      : List[str]
-                  List of cleaned question strings of length N_q.
-    model_name  : str | Sequence[str]
-                  Single model name or list of names. Each model is cached individually.
-                  Default is Quora‐fine‐tuned DistilBERT.
-    cache_dir   : str
-                  Directory to cache the hashed embedding file.
-    batch_size  : int
-                  Batch size for SentenceTransformer.encode(…).
-    out_fp      : str or None
-                  If provided, also write embeddings to this exact filepath.
-
-    Returns
-    -------
-    emb : np.ndarray, dtype=float32, shape = (N_q, embedding_dim)
-          `embedding_dim` depends on the model(s): 768 for base models,
-          384 for MiniLM variants, or the sum when multiple models are used.
-    """
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(parents=True, exist_ok=True)
-
-    # If user passed multiple models, build each then concatenate
-    if isinstance(model_name, Sequence) and not isinstance(model_name, (str, bytes)):
-        embeddings = [
-            build_st_embeddings(corpus, m, cache_dir=cache_dir, batch_size=batch_size)
-            for m in model_name
-        ]
-        emb = np.hstack(embeddings).astype("float32")
-        if out_fp is not None:
-            out_path = Path(out_fp)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            np.save(out_path, emb)
+    if cache_fp.exists():
+        emb = np.load(cache_fp, mmap_mode="r")
+        # optional save_path copy for canonical location
+        if save_path is not None and not Path(save_path).exists():
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            np.save(save_path, emb)
         return emb
 
-    # Compute the hashed filename under cache_dir
-    fp = cache_path / _cache_name(model_name)
-
-    # If that file already exists, mmap-load and return it
-    if fp.exists():
-        return np.load(fp, mmap_mode="r")
-
-    # Otherwise, we need to instantiate the SentenceTransformer and encode
-    from sentence_transformers import SentenceTransformer
-
+    # -------------------------------------------------- encode (cache miss)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model  = SentenceTransformer(model_name, device=device)
+    model = SentenceTransformer(model_name, device=device)
 
-    # Encode entire corpus in batches, normalize to unit length, return float32
+    start = time.perf_counter()
     emb = model.encode(
-        corpus,
+        texts,
         batch_size=batch_size,
-        normalize_embeddings=True,
-        convert_to_numpy=True
-    ).astype("float32")
+        show_progress_bar=True,
+        normalize_embeddings=normalize,
+        convert_to_numpy=True,
+    ).astype(np.float32)
+    elapsed = round(time.perf_counter() - start, 3)
 
-    # Save under the hashed filename for future runs
-    np.save(fp, emb)
+    if target_dim is not None and emb.shape[1] != target_dim:
+        raise ValueError(
+            f"Model {model_name!r} produced {emb.shape[1]}‑d vectors; expected {target_dim}."
+        )
 
-    # If the user requested a canonical output path, write there as well
-    if out_fp is not None:
-        out_path = Path(out_fp)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(out_path, emb)
+    # -------------------------------------------------- save + log
+    np.save(cache_fp, emb)
+    if save_path is not None:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        np.save(save_path, emb)
+
+    log_event(
+        LogKind.PREPROCESSING,
+        model=model_name,
+        dim=emb.shape[1],
+        n=len(texts),
+        seconds=elapsed,
+        saved=str(save_path) if save_path else None,
+    )
 
     return emb
+
+###############################################################################
+# 3. EXPORTS
+###############################################################################
+__all__ = [
+    "SUPPORTED_EMB",
+    "clean_text",
+    "clean_and_stats",
+    "clean_series",
+    "build_st_embeddings",
+]
