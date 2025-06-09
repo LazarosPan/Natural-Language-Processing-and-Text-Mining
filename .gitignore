@@ -3,3 +3,4 @@ project-description.pdf
 models/
 src/__pycache__/
 .ipynb_checkpoints
+notes.txt
