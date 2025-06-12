@@ -7,14 +7,13 @@ Usage
 -----
 from src.logs import log_event, LogKind
 
-log_event(LogKind.FEATURES, model="PCA-600", phase="fit",
-          seconds=12.8, extra="explained_var=0.952")
+# default writes to metric_logs/benchmarks.csv
+log_event(LogKind.TEST, model="MyModel", phase="eval", seconds=1.23)
+# to write to a folder-specific CSV, pass folder="lr0.05_ep10"
+log_event(LogKind.TEST, folder="lr0.05_ep10", model="MyModel", phase="eval", seconds=1.23)
 
-log_event(LogKind.MODEL, model="LightGBM", phase="train",
-          seconds=3.42, src_dims=768, valid_LL=0.0741)
-
-All logs live under  ./metric_logs/<kind>.csv
-Each row is one line, no header needed – easy to `pandas.read_csv(...)`.
+All logs live under  ./metric_logs/<kind>(_<folder>).csv
+Each line is one line, no header needed – easy to `pandas.read_csv(...)`.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ import time
 from enum import Enum
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent     # project root
+ROOT    = Path(__file__).resolve().parent.parent     # project root
 LOG_DIR = ROOT / "metric_logs"
 LOG_DIR.mkdir(exist_ok=True)
 
@@ -36,6 +35,7 @@ class LogKind(str, Enum):
     GATE            = "gates"           # subset gate tuning
     TEST            = "benchmarks"      # 05_benchmarks
 
+
 def _ts() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -46,21 +46,25 @@ def _caller() -> str:
     file  = pathlib.Path(frame.filename).name
     return file
 
+
 def log_event(kind: LogKind, **kv):
     """
-    Append one comma-separated line to metric_logs/<kind>.csv.
+    Append one comma-separated line to metric_logs/<kind>(_folder).csv.
 
-    Every line starts with: timestamp, caller, pid … then user-supplied key=value pairs.
+    Pass an optional 'folder' kwarg to write to e.g. benchmarks_<folder>.csv
     """
-    # Use kind.value (e.g. "splits", "eda", etc.) rather than str(kind)
-    fname = f"{kind.value}.csv"
+    # extract optional folder suffix
+    folder = kv.pop('folder', None)
+    # build filename
+    fname = kind.value + (f"_{folder}" if folder else "") + ".csv"
     fp = LOG_DIR / fname
-    
-    # Ensure parent directory exists (although we created LOG_DIR above)
+
+    # Ensure parent directory exists
     fp.parent.mkdir(parents=True, exist_ok=True)
-    
+
     with fp.open("a", encoding="utf8") as f:
         prefix = f"{_ts()},{_caller()},pid={os.getpid()}"
         body   = ",".join(f"{k}={v}" for k, v in kv.items())
         line = prefix + ("," + body if body else "") + "\n"
+
         f.write(line)

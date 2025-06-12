@@ -430,9 +430,10 @@ class MoEClassifier:
       .evaluate(pairs, y)    – return binary log-loss on given dataset
     """
 
-    def __init__(self, experts: List[BaseExpert], lr: float = 1e-2, epochs: int = 100):
+    def __init__(self, experts: List[BaseExpert], lr: float = 1e-2, epochs: int = 100, patience = 10):
         self.experts = experts
         self.epochs = epochs
+        self.patence = patience
         self.gate = _GateNet(len(experts)).to(_DEVICE)
         self.opt = torch.optim.Adam(self.gate.parameters(), lr=lr)
         self.loss_fn = nn.BCELoss()  # binary cross-entropy

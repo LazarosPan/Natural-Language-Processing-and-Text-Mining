@@ -1,0 +1,10 @@
+2025-06-13 00:02:55,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert+CrossEncExpert+LGBMFeatureExpert,phase=eval,seconds=302.37,test_LL=0.110104,test_ACC=0.978,test_F1=0.9708,test_PREC=0.9614,test_REC=0.9804,test_AUC=0.997
+2025-06-13 00:09:16,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert+CrossEncExpert+XGBFeatureExpert+RFFeatureExpert,phase=eval,seconds=373.27,test_LL=0.101186,test_ACC=0.9904,test_F1=0.9872,test_PREC=0.9844,test_REC=0.99,test_AUC=0.9974
+2025-06-13 00:14:11,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert+CrossEncExpert+XGBFeatureExpert,phase=eval,seconds=288.22,test_LL=0.094231,test_ACC=0.9827,test_F1=0.9771,test_PREC=0.9623,test_REC=0.9923,test_AUC=0.9975
+2025-06-13 00:17:51,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert+CrossEncExpert,phase=eval,seconds=203.74,test_LL=0.047356,test_ACC=0.9903,test_F1=0.987,test_PREC=0.9834,test_REC=0.9906,test_AUC=0.9981
+2025-06-13 00:21:19,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert+LGBMFeatureExpert,phase=eval,seconds=204.44,test_LL=0.076406,test_ACC=0.9903,test_F1=0.987,test_PREC=0.984,test_REC=0.99,test_AUC=0.9973
+2025-06-13 00:23:22,<frozen runpy>,pid=14977,model=BertExpert+RobertaExpert,phase=eval,seconds=119.7,test_LL=0.052055,test_ACC=0.988,test_F1=0.9838,test_PREC=0.9853,test_REC=0.9824,test_AUC=0.9978
+2025-06-13 00:26:18,<frozen runpy>,pid=14977,model=RobertaExpert+CrossEncExpert,phase=eval,seconds=170.64,test_LL=0.050735,test_ACC=0.9903,test_F1=0.987,test_PREC=0.9842,test_REC=0.9898,test_AUC=0.9977
+2025-06-13 00:29:12,<frozen runpy>,pid=14977,model=RobertaExpert+LGBMFeatureExpert,phase=eval,seconds=171.3,test_LL=0.220284,test_ACC=0.9895,test_F1=0.9859,test_PREC=0.9818,test_REC=0.99,test_AUC=0.994
+2025-06-13 00:32:23,<frozen runpy>,pid=14977,model=RobertaExpert+QuoraDistilExpert+CrossEncExpert,phase=eval,seconds=179.9,test_LL=0.082726,test_ACC=0.9903,test_F1=0.987,test_PREC=0.9839,test_REC=0.99,test_AUC=0.9978
+2025-06-13 00:33:52,<frozen runpy>,pid=14977,model=RobertaExpert,phase=eval,seconds=86.8,test_LL=0.057652,test_ACC=0.9901,test_F1=0.9867,test_PREC=0.9838,test_REC=0.9897,test_AUC=0.998
