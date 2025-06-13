@@ -1,9 +1,28 @@
 # Natural-Language-Processing-and-Text-Mining
 Quora Dataset — Determine if two questions ask the same thing
 
-# Mixture-of-Experts Pipeline (384D & 768D Paths) — Full Walkthrough
+# Overview
 
-This repository implements a scalable, modular, and reproducible Mixture-of-Experts (MoE) pipeline for Quora duplicate question detection. The system mixes feature-based models, transformer-based experts, and dimensionality-reduced versions using PCA/UMAP. Models are cached and evaluated with a unified gate mechanism.
+This repository presents a modular and reproducible pipeline for detecting semantically equivalent questions in the Quora Question Pairs (QQP) dataset. It implements a Mixture-of-Experts (MoE) architecture that blends predictions from both classical machine learning models and pretrained transformer-based models through a softmax-trained gating mechanism. Extensive preprocessing, diverse feature engineering, and dimensionality reduction (IPCA & UMAP) contribute to robust and generalizable performance.
+
+---
+
+## Key Highlights
+
+- Multi-resolution sentence embeddings (MiniLM, MPNet)
+
+- Lexical, semantic, structural, and fuzzy features (~3600 features)
+
+- Dimensionality reduction using IPCA (k95) and UMAP
+
+- Multiple expert types: LR, SVM, XGB, LGBM, BERT, RoBERTa, CrossEnc, etc.
+
+- Learnable soft-gate over expert logits (trained on validation log-loss)
+
+- Cached embeddings, predictions, models, and gate weights
+
+- Evaluation logged via lightweight .csv logger for reproducibility
+
 
 ---
 
@@ -13,43 +32,43 @@ This repository implements a scalable, modular, and reproducible Mixture-of-Expe
 Natural-Language-Processing-and-Text-Mining/
 ├── data/
 │   ├── quora.csv
-│   ├── splits/
-│   │   ├── train.csv
-│   │   ├── valid.csv
-│   │   └── test.csv
-│   └── processed/
+│   ├── splits/                 # train/valid/test (no question leakage)
+│   └── processed/              # clean text, embeddings, features
 │       ├── question_meta.csv
 │       ├── clean_questions.npy
-│       └── question_embeddings.npy
+│       ├── question_embeddings_384.npy / 768.npy
+│       └── X_*_{ipca, umap}.npy
 │
 ├── models/
-│   ├── custom/           # Classical ML models (e.g., LR, XGB, LGBM, SVM)
-│   ├── pretrained/       # QuoraDistilExpert logistic regression, pretrained assets
-│   ├── pred_cache/       # Cached prediction outputs from experts
-│   ├── gates/            # MoE gate weights, indices of top experts
-│   └── features/         # Saved TF-IDF, SVD, PCA models
+│   ├── custom/                 # Pickled classical experts (LR, SVM, etc.)
+│   ├── pretrained/             # Logistic head weights for DistilBERT
+│   ├── pred_cache/             # Per-expert .npy prediction logs
+│   ├── features*/              # TF-IDF, SVD, PCA caches
+│   └── gates/                  # MoE gate weights and expert subset indices
 │
 ├── notebooks/
-│   ├── 00_split.ipynb            # Data splitting
-│   ├── 01_eda.ipynb              # Exploratory Data Analysis
-│   ├── 02_preprocessing.ipynb    # Text cleaning, embedding
-│   ├── 03_feature_engineering.ipynb
-│   ├── 04_models.ipynb           # Expert training + MoE gate tuning
-│   └── 05_benchmarks.ipynb       # Final test evaluation
+│   ├── 0_split.ipynb
+│   ├── 1_eda.ipynb
+│   ├── 2_preprocessing.ipynb
+│   ├── 3_feature_engineering.ipynb
+│   ├── 4_models.ipynb
+│   └── 5_benchmarks_lr{X}_ep{Y}.ipynb
 │
 ├── src/
-│   ├── preprocessing.py      # Cleaning functions, text normalizers
-│   ├── features.py           # Feature builders, vectorizers
-│   ├── modeling.py           # Utility functions for model wrappers
-│   ├── pretrained_models.py  # Pretrained expert classes (BERT, CrossEnc, etc.)
-│   ├── custom_models.py      # Classical ML expert classes (LR, SVM, etc.)
-│   └── logs.py               # Unified logging interface
+│   ├── preprocessing.py        # Cleaners, SBERT cache, len/word stats
+│   ├── features.py             # Feature blocks, IPCA/UMAP
+│   ├── custom_models.py        # LR/XGB/LGBM/etc. experts
+│   ├── pretrained_models.py    # BERT, RoBERTa, Distil, CrossEnc, MoE
+│   └── logs.py                 # CSV logger by event type
 │
 └── metric_logs/
-    ├── features.csv      # Logs from 03_feature_engineering
-    ├── models.csv        # Logs from individual expert training
-    ├── gates.csv         # Logs from gate tuning and evaluation
-    └── benchmarks.csv    # Final test performance (accuracy, F1, etc.)
+    ├── splits.csv
+    ├── eda.csv / eda_summary.csv
+    ├── preprocessing.csv
+    ├── features.csv
+    ├── models.csv
+    ├── gates.csv
+    └── benchmarks_lrX_epY.csv
 
 ```
 
@@ -58,16 +77,16 @@ Natural-Language-Processing-and-Text-Mining/
 
 ## Notebook-by-Notebook Overview
 
-### 00_split.ipynb
+### 0_split.ipynb
 - Fixes reproducible splits (train/valid/test)
 - Drops rows with nulls
 - Saves `train.csv`, `valid.csv`, `test.csv` to `data/splits/`
 
-### 01_eda.ipynb
+### 1_eda.ipynb
 - Explores class balance, length distributions, top tokens
 - Logs EDA statistics to `metric_logs/eda.csv`
 
-### 02_preprocessing.ipynb
+### 2_preprocessing.ipynb
 - Creates per-question artifacts:
   - Raw, cleaned, lowercased
   - Lengths (chars/words)
@@ -77,7 +96,7 @@ Natural-Language-Processing-and-Text-Mining/
   - `clean_questions.npy`
   - `question_embeddings.npy`
 
-### 03_feature_engineering.ipynb
+### 3_feature_engineering.ipynb
 - Computes 3,598-dimensional features:
   - TF-IDF word/char
   - SVD word/char
@@ -93,7 +112,7 @@ Natural-Language-Processing-and-Text-Mining/
   - UMAP only (X_*_umap.npy)
   - IPCA + UMAP (X_*_ipca_umap.npy)
 
-### 04_models.ipynb
+### 4_models.ipynb
 - Two branches:
   - **Pretrained experts** use full (768D or 384D) sentence embeddings
   - **Custom experts** use reduced 3D (PCA/UMAP) engineered features
@@ -112,7 +131,7 @@ Natural-Language-Processing-and-Text-Mining/
   - Logs all results with validation log-loss
   - Top-10 subsets are retrained on Train+Valid
 
-### 05_benchmarks.ipynb
+### 5_benchmarks*.ipynb
 - Loads top-10 MoE gates from `models/gates/`
 - Loads corresponding `moe_*_idxs.npy` subsets
 - Runs `.predict_prob()` on `test.csv`
@@ -124,13 +143,13 @@ Natural-Language-Processing-and-Text-Mining/
 
 ## Evaluation Pipeline
 
-- All metrics are logged via `log_event(...)` to `.csv` files
-- You can use `05_benchmarks.ipynb` or the plotting tool to visualize:
-  - Top-10 performance comparisons
-  - Time vs log-loss tradeoffs
-  - Accuracy/F1 per MoE gate
-  - Correlation heatmaps of metric interactions
-
+- Evaluation metrics: Log-Loss, Accuracy, F1, Precision, Recall, ROC-AUC, Inference Time
+- Gated combinations evaluated on test set under 3 configurations:
+  - lr=0.001, epochs=1
+  - lr=0.01, epochs=2
+  - lr=0.05, epochs=10
+- Results are stored in `metric_logs/benchmarks_lrX_epY.csv`
+- Heatmap visualizations and correlation analyses assess metric interdependence
 ---
 
 ## Requirements (minimal)
@@ -157,30 +176,36 @@ Optional:
 sentencepiece # required for XLNetExpert
 ```
 
-
 ---
 
 ## How to Reproduce
 
 1. Download the `quora.csv` dataset into `data/`
-2. Run the notebooks in order:
-   - `00_split.ipynb`
-   - `01_eda.ipynb`
-   - `02_preprocessing.ipynb`
-   - `03_feature_engineering.ipynb`
-   - `04_models.ipynb`
-   - `05_benchmarks.ipynb`
+2. Run `main.py`or the notebooks in order:
+   - `0_split.ipynb`
+   - `1_eda.ipynb`
+   - `2_preprocessing.ipynb`
+   - `3_feature_engineering.ipynb`
+   - `4_models.ipynb`
+   - `5_benchmarks*.ipynb`
+   - `6_benchmarks.ipynb`
 3. Inspect results in `metric_logs/` or plot from CSVs
 4. Run ablations by altering feature reduction or expert list
 
 ---
 
-## Notes for Academic Use
+## Academic Use
 
-- All experiments are reproducible (seed fixed)
-- Feature extraction, model training, and predictions are cached
-- MoE architecture supports heterogeneous expert types (BERT + LR + CrossEnc)
-- Dimensionality reduction and custom experts allow performance vs cost analysis
-- Logs are flat and parseable for analysis or paper inclusion
+This repository was developed as part of a course assignment. It includes:
+
+  - Modular architecture with clear separation of concerns
+
+  - Feature-based + transformer-based modeling synergy
+
+  - Log-based tracking for reproducibility
+
+  - Validation-driven MoE tuning
+
+  - Full support for ablation and metric correlation analysis
 
 ---

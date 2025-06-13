@@ -11,6 +11,7 @@ Notebooks live under the `notebooks/` subdirectory:
   notebooks/3_feature_engineering.ipynb
   notebooks/4_models.ipynb
   notebooks/5_benchmarks.ipynb
+  notebooks/6_summary.ipynb
 
 Each notebook is executed in place (outputs are written back). If any
 notebook fails, the script stops and reports the error.
@@ -26,6 +27,7 @@ NOTEBOOKS = [
     "3_feature_engineering.ipynb",
     "4_models.ipynb",
     "5_benchmarks*.ipynb",
+    "6_summary.ipynb"
 ]
 
 def check_nbconvert_installed():
