@@ -139,6 +139,10 @@ Natural-Language-Processing-and-Text-Mining/
   - `test_LL`, `test_ACC`, `test_F1`, `test_PREC`, `test_REC`, `test_AUC`, `seconds`
 - Logs to: `metric_logs/benchmarks.csv`
 
+
+### 6_summary.ipynb
+- Result tables of the benchmarks.
+- Correlation between metrics and hyperparameters.
 ---
 
 ## Evaluation Pipeline
@@ -188,7 +192,7 @@ sentencepiece # required for XLNetExpert
    - `3_feature_engineering.ipynb`
    - `4_models.ipynb`
    - `5_benchmarks*.ipynb`
-   - `6_benchmarks.ipynb`
+   - `6_summary.ipynb`
 3. Inspect results in `metric_logs/` or plot from CSVs
 4. Run ablations by altering feature reduction or expert list
 
